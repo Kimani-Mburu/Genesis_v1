@@ -383,7 +383,7 @@ bool ResponseActionsManager::execute_quarantine_action(const ActionContext& cont
         
         std::string quarantine_file = quarantine_dir + "/quarantined_" + 
                                     std::to_string(timestamp) + "_" + 
-                                    std::filesystem::path(context.target_file).filename();
+                                    std::filesystem::path(context.target_file).filename().string();
         
         // Move file to quarantine (safer than copy+delete)
         std::string move_cmd = "mv \"" + context.target_file + "\" \"" + quarantine_file + "\"";
@@ -517,16 +517,23 @@ void ResponseActionsManager::send_monitoring_notification(const ActionContext& c
 void ResponseActionsManager::log_action_execution(const ActionResult& result, 
                                                 const ActionContext& context) {
     try {
-        // Log to system log
-        std::ostringstream log_message;
-        log_message << "GENESIS Action: " << result.action_name 
-                   << " | Success: " << (result.success ? "YES" : "NO")
-                   << " | Target: " << context.target_process
-                   << " | PID: " << context.target_pid
-                   << " | Threat: " << context.threat_description;
+        // Sanitize all logged data
+        std::string safe_action = sanitize_string(result.action_name);
+        std::string safe_process = sanitize_string(context.target_process);
+        std::string safe_threat = sanitize_string(context.threat_description);
         
-        std::string syslog_cmd = "logger -p security.info \"" + log_message.str() + "\"";
-        std::system(syslog_cmd.c_str());
+        // Log to system log using safe command execution
+        std::ostringstream log_message;
+        log_message << "GENESIS Action: " << safe_action 
+                   << " | Success: " << (result.success ? "YES" : "NO")
+                   << " | Target: " << safe_process
+                   << " | PID: " << context.target_pid
+                   << " | Threat: " << safe_threat;
+        
+        std::vector<std::string> syslog_cmd = {
+            "logger", "-p", "security.info", log_message.str()
+        };
+        execute_command_safely(syslog_cmd);
         
         // Also log to console
         std::cout << "[ResponseActions] " << log_message.str() << std::endl;
@@ -534,6 +541,175 @@ void ResponseActionsManager::log_action_execution(const ActionResult& result,
     } catch (const std::exception& e) {
         std::cerr << "[ResponseActions] Failed to log action: " << e.what() << std::endl;
     }
+}
+
+// Security helper methods implementation
+bool ResponseActionsManager::validate_context(const ActionContext& context) const {
+    // Check string lengths to prevent buffer overflows
+    if (context.threat_description.length() > MAX_STRING_LENGTH ||
+        context.target_process.length() > MAX_STRING_LENGTH ||
+        context.target_ip.length() > MAX_STRING_LENGTH ||
+        context.target_file.length() > MAX_STRING_LENGTH) {
+        return false;
+    }
+    
+    // Check for null bytes that could indicate injection attempts
+    auto has_null_byte = [](const std::string& str) {
+        return str.find('\0') != std::string::npos;
+    };
+    
+    if (has_null_byte(context.threat_description) ||
+        has_null_byte(context.target_process) ||
+        has_null_byte(context.target_ip) ||
+        has_null_byte(context.target_file)) {
+        return false;
+    }
+    
+    return true;
+}
+
+std::string ResponseActionsManager::sanitize_string(const std::string& input) const {
+    std::string result;
+    result.reserve(input.length());
+    
+    for (char c : input) {
+        // Remove dangerous shell characters
+        if (c == ';' || c == '|' || c == '&' || c == '$' || c == '`' ||
+            c == '"' || c == '\'' || c == '\\' || c == '\n' || c == '\r' ||
+            c == '\0' || c == '<' || c == '>') {
+            result += '_'; // Replace with underscore
+        } else if (std::isprint(c) || std::isspace(c)) {
+            result += c;
+        }
+        // Skip non-printable characters
+    }
+    
+    // Truncate if too long
+    if (result.length() > MAX_STRING_LENGTH) {
+        result.resize(MAX_STRING_LENGTH);
+    }
+    
+    return result;
+}
+
+bool ResponseActionsManager::execute_command_safely(const std::vector<std::string>& command) const {
+    if (command.empty()) {
+        return false;
+    }
+    
+    try {
+        // Use execvp approach for safer command execution
+        pid_t pid = fork();
+        
+        if (pid == 0) {
+            // Child process
+            std::vector<char*> args;
+            for (const auto& arg : command) {
+                args.push_back(const_cast<char*>(arg.c_str()));
+            }
+            args.push_back(nullptr);
+            
+            execvp(args[0], args.data());
+            _exit(127); // exec failed
+        } else if (pid > 0) {
+            // Parent process - wait for child
+            int status;
+            waitpid(pid, &status, 0);
+            return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        } else {
+            // Fork failed
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[ResponseActions] Command execution failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool ResponseActionsManager::is_valid_process_name(const std::string& name) const {
+    if (name.empty() || name.length() > 255) {
+        return false;
+    }
+    
+    // Process names should not contain dangerous characters
+    for (char c : name) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.' && c != '/') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool ResponseActionsManager::is_valid_file_path(const std::string& path) const {
+    if (path.empty() || path.length() > 4096) {
+        return false;
+    }
+    
+    // Basic path validation - should start with / for absolute paths
+    if (path[0] != '/') {
+        return false;
+    }
+    
+    // Check for dangerous path components
+    if (path.find("..") != std::string::npos ||
+        path.find("//") != std::string::npos) {
+        return false;
+    }
+    
+    return true;
+}
+
+bool ResponseActionsManager::is_valid_ip_address(const std::string& ip) const {
+    if (ip.empty() || ip.length() > 45) { // Max IPv6 length
+        return false;
+    }
+    
+    // Simple IPv4 validation
+    if (ip.find(':') == std::string::npos) {
+        // IPv4 format
+        std::istringstream iss(ip);
+        std::string octet;
+        int count = 0;
+        
+        while (std::getline(iss, octet, '.')) {
+            if (++count > 4) return false;
+            
+            try {
+                int val = std::stoi(octet);
+                if (val < 0 || val > 255) return false;
+            } catch (...) {
+                return false;
+            }
+        }
+        
+        return count == 4;
+    }
+    
+    // For IPv6, accept it if it contains valid hex characters and colons
+    for (char c : ip) {
+        if (!std::isxdigit(c) && c != ':') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool ResponseActionsManager::is_valid_pid(pid_t pid) const {
+    return pid > 0 && static_cast<size_t>(pid) <= MAX_PID_VALUE;
+}
+
+std::unordered_map<std::string, std::pair<size_t, size_t>> 
+ResponseActionsManager::get_action_statistics() const {
+    std::lock_guard<std::mutex> lock(actions_mutex_);
+    
+    std::unordered_map<std::string, std::pair<size_t, size_t>> stats;
+    for (const auto& [name, info] : actions_) {
+        stats[name] = {info.execution_count, info.success_count};
+    }
+    
+    return stats;
 }
 
 } // namespace response

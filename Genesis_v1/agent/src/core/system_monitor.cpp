@@ -362,7 +362,7 @@ void SystemMonitor::collect_process_files(const std::string& fd_path, ProcessInf
     try {
         int file_count = 0;
         for (const auto& fd_entry : std::filesystem::directory_iterator(fd_path)) {
-            if (++file_count > MAX_FILES_PER_PROCESS) break; // Limit to avoid excessive processing
+            if (++file_count > static_cast<int>(MAX_FILES_PER_PROCESS)) break; // Limit to avoid excessive processing
             
             if (std::filesystem::is_symlink(fd_entry)) {
                 std::error_code ec;

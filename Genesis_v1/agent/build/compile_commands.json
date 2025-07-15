@@ -1,0 +1,32 @@
+[
+{
+  "directory": "/workspace/Genesis_v1/agent/build",
+  "command": "/usr/bin/c++  -I/workspace/Genesis_v1/agent/src -g -O0 -Wall -Wextra -DDEBUG -std=gnu++17 -o CMakeFiles/genesis_agent.dir/src/core/system_monitor.cpp.o -c /workspace/Genesis_v1/agent/src/core/system_monitor.cpp",
+  "file": "/workspace/Genesis_v1/agent/src/core/system_monitor.cpp",
+  "output": "CMakeFiles/genesis_agent.dir/src/core/system_monitor.cpp.o"
+},
+{
+  "directory": "/workspace/Genesis_v1/agent/build",
+  "command": "/usr/bin/c++  -I/workspace/Genesis_v1/agent/src -g -O0 -Wall -Wextra -DDEBUG -std=gnu++17 -o CMakeFiles/genesis_agent.dir/src/core/behavioral_profiler.cpp.o -c /workspace/Genesis_v1/agent/src/core/behavioral_profiler.cpp",
+  "file": "/workspace/Genesis_v1/agent/src/core/behavioral_profiler.cpp",
+  "output": "CMakeFiles/genesis_agent.dir/src/core/behavioral_profiler.cpp.o"
+},
+{
+  "directory": "/workspace/Genesis_v1/agent/build",
+  "command": "/usr/bin/c++  -I/workspace/Genesis_v1/agent/src -g -O0 -Wall -Wextra -DDEBUG -std=gnu++17 -o CMakeFiles/genesis_agent.dir/src/core/immune_engine.cpp.o -c /workspace/Genesis_v1/agent/src/core/immune_engine.cpp",
+  "file": "/workspace/Genesis_v1/agent/src/core/immune_engine.cpp",
+  "output": "CMakeFiles/genesis_agent.dir/src/core/immune_engine.cpp.o"
+},
+{
+  "directory": "/workspace/Genesis_v1/agent/build",
+  "command": "/usr/bin/c++  -I/workspace/Genesis_v1/agent/src -g -O0 -Wall -Wextra -DDEBUG -std=gnu++17 -o CMakeFiles/genesis_agent.dir/src/response/placeholder.cpp.o -c /workspace/Genesis_v1/agent/src/response/placeholder.cpp",
+  "file": "/workspace/Genesis_v1/agent/src/response/placeholder.cpp",
+  "output": "CMakeFiles/genesis_agent.dir/src/response/placeholder.cpp.o"
+},
+{
+  "directory": "/workspace/Genesis_v1/agent/build",
+  "command": "/usr/bin/c++  -I/workspace/Genesis_v1/agent/src -g -O0 -Wall -Wextra -DDEBUG -std=gnu++17 -o CMakeFiles/genesis_agent.dir/src/main.cpp.o -c /workspace/Genesis_v1/agent/src/main.cpp",
+  "file": "/workspace/Genesis_v1/agent/src/main.cpp",
+  "output": "CMakeFiles/genesis_agent.dir/src/main.cpp.o"
+}
+]
