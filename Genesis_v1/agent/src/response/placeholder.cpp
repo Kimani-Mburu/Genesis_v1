@@ -188,21 +188,32 @@ bool ResponseActionsManager::drop_privileges(const std::string& username, const 
 
 bool ResponseActionsManager::execute_alert_action(const ActionContext& context) {
     try {
-        // Send alert via syslog
-        std::string syslog_cmd = "logger -p security.warning \"GENESIS ALERT: " + 
-                               context.threat_description + " (Process: " + 
-                               context.target_process + ")\"";
+        // Validate input to prevent injection attacks
+        if (!validate_context(context)) {
+            std::cerr << "[ResponseActions] Invalid context for alert action" << std::endl;
+            return false;
+        }
         
-        int result = std::system(syslog_cmd.c_str());
+        // Sanitize strings to prevent command injection
+        std::string safe_threat = sanitize_string(context.threat_description);
+        std::string safe_process = sanitize_string(context.target_process);
+        
+        // Use safe command execution instead of std::system
+        std::vector<std::string> syslog_cmd = {
+            "logger", "-p", "security.warning",
+            "GENESIS ALERT: " + safe_threat + " (Process: " + safe_process + ")"
+        };
+        
+        bool result = execute_command_safely(syslog_cmd);
         
         // Also write to console for immediate visibility
-        std::cout << "🚨 SECURITY ALERT: " << context.threat_description 
-                 << " (Process: " << context.target_process << ")" << std::endl;
+        std::cout << "🚨 SECURITY ALERT: " << safe_threat 
+                 << " (Process: " << safe_process << ")" << std::endl;
         
-        // Optionally send notification to monitoring systems
+        // Send notification to monitoring systems
         send_monitoring_notification(context);
         
-        return (result == 0);
+        return result;
         
     } catch (const std::exception& e) {
         std::cerr << "[ResponseActions] Alert action failed: " << e.what() << std::endl;
@@ -212,37 +223,45 @@ bool ResponseActionsManager::execute_alert_action(const ActionContext& context) 
 
 bool ResponseActionsManager::execute_isolate_action(const ActionContext& context) {
     try {
-        if (context.target_pid <= 0) {
-            std::cerr << "[ResponseActions] Invalid PID for isolation: " << context.target_pid << std::endl;
+        if (!validate_context(context) || !is_valid_pid(context.target_pid)) {
+            std::cerr << "[ResponseActions] Invalid context for isolation" << std::endl;
             return false;
         }
         
-        // Create isolation cgroup
+        // Create isolation cgroup using safe file operations
         std::string cgroup_path = "/sys/fs/cgroup/genesis_isolation";
-        std::string mkdir_cmd = "mkdir -p " + cgroup_path;
         
-        if (std::system(mkdir_cmd.c_str()) != 0) {
-            std::cerr << "[ResponseActions] Failed to create isolation cgroup" << std::endl;
+        try {
+            std::filesystem::create_directories(cgroup_path);
+        } catch (const std::filesystem::filesystem_error& e) {
+            std::cerr << "[ResponseActions] Failed to create isolation cgroup: " << e.what() << std::endl;
             return false;
         }
         
-        // Limit CPU to 1%
-        std::string cpu_limit_cmd = "echo 1000 > " + cgroup_path + "/cpu.cfs_quota_us";
-        if (std::system(cpu_limit_cmd.c_str()) != 0) {
+        // Set CPU limit to 1% using direct file I/O (safer than shell commands)
+        std::ofstream cpu_file(cgroup_path + "/cpu.cfs_quota_us");
+        if (cpu_file) {
+            cpu_file << "1000" << std::endl;
+            cpu_file.close();
+        } else {
             std::cerr << "[ResponseActions] Failed to set CPU limit" << std::endl;
         }
         
-        // Limit memory to 10MB
-        std::string mem_limit_cmd = "echo 10485760 > " + cgroup_path + "/memory.limit_in_bytes";
-        if (std::system(mem_limit_cmd.c_str()) != 0) {
+        // Set memory limit to 10MB using direct file I/O
+        std::ofstream mem_file(cgroup_path + "/memory.limit_in_bytes");
+        if (mem_file) {
+            mem_file << "10485760" << std::endl;
+            mem_file.close();
+        } else {
             std::cerr << "[ResponseActions] Failed to set memory limit" << std::endl;
         }
         
-        // Move process to isolation cgroup
-        std::string isolate_cmd = "echo " + std::to_string(context.target_pid) + 
-                                " > " + cgroup_path + "/cgroup.procs";
-        
-        if (std::system(isolate_cmd.c_str()) == 0) {
+        // Move process to isolation cgroup using direct file I/O
+        std::ofstream cgroup_file(cgroup_path + "/cgroup.procs");
+        if (cgroup_file) {
+            cgroup_file << context.target_pid << std::endl;
+            cgroup_file.close();
+            
             std::cout << "[ResponseActions] Process " << context.target_pid 
                      << " isolated successfully" << std::endl;
             return true;
@@ -296,34 +315,40 @@ bool ResponseActionsManager::execute_terminate_action(const ActionContext& conte
 
 bool ResponseActionsManager::execute_block_action(const ActionContext& context) {
     try {
-        if (context.target_ip.empty()) {
-            std::cerr << "[ResponseActions] No IP address specified for blocking" << std::endl;
+        if (!validate_context(context) || !is_valid_ip_address(context.target_ip)) {
+            std::cerr << "[ResponseActions] Invalid IP address for blocking" << std::endl;
             return false;
         }
         
-        // Block incoming connections from the IP
-        std::string block_input_cmd = "iptables -A INPUT -s " + context.target_ip + " -j DROP";
+        std::string safe_ip = sanitize_string(context.target_ip);
         
-        // Block outgoing connections to the IP
-        std::string block_output_cmd = "iptables -A OUTPUT -d " + context.target_ip + " -j DROP";
+        // Use safe command execution for iptables
+        std::vector<std::string> block_input_cmd = {
+            "iptables", "-A", "INPUT", "-s", safe_ip, "-j", "DROP"
+        };
         
-        bool success = true;
+        std::vector<std::string> block_output_cmd = {
+            "iptables", "-A", "OUTPUT", "-d", safe_ip, "-j", "DROP"
+        };
         
-        if (std::system(block_input_cmd.c_str()) != 0) {
-            std::cerr << "[ResponseActions] Failed to block input from " << context.target_ip << std::endl;
-            success = false;
+        bool input_success = execute_command_safely(block_input_cmd);
+        bool output_success = execute_command_safely(block_output_cmd);
+        
+        if (!input_success) {
+            std::cerr << "[ResponseActions] Failed to block input from " << safe_ip << std::endl;
         }
         
-        if (std::system(block_output_cmd.c_str()) != 0) {
-            std::cerr << "[ResponseActions] Failed to block output to " << context.target_ip << std::endl;
-            success = false;
+        if (!output_success) {
+            std::cerr << "[ResponseActions] Failed to block output to " << safe_ip << std::endl;
         }
+        
+        bool success = input_success && output_success;
         
         if (success) {
-            std::cout << "[ResponseActions] Blocked network access for " << context.target_ip << std::endl;
+            std::cout << "[ResponseActions] Blocked network access for " << safe_ip << std::endl;
             
             // Also block the specific process if PID is available
-            if (context.target_pid > 0) {
+            if (is_valid_pid(context.target_pid)) {
                 block_process_network(context.target_pid);
             }
         }
