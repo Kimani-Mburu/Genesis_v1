@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgenesis-core.a "CMakeFiles/genesis-core.dir/src/core/behavioral_profiler.cpp.o" "CMakeFiles/genesis-core.dir/src/core/immune_engine.cpp.o"
+/usr/bin/ranlib libgenesis-core.a

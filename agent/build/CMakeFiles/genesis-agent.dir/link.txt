@@ -1,0 +1,1 @@
+/usr/bin/c++ -Xlinker --dependency-file=CMakeFiles/genesis-agent.dir/link.d "CMakeFiles/genesis-agent.dir/src/main.cpp.o" -o genesis-agent  libgenesis-core.a libgenesis-hooks.a libgenesis-response.a libgenesis-sync.a libgenesis-core.a libgenesis-hooks.a libgenesis-response.a libgenesis-sync.a -luuid

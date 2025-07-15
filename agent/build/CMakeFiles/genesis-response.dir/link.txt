@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgenesis-response.a "CMakeFiles/genesis-response.dir/src/response/placeholder.cpp.o"
+/usr/bin/ranlib libgenesis-response.a

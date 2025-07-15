@@ -1,0 +1,12 @@
+/workspace/agent/build/CMakeFiles/genesis-core.dir
+/workspace/agent/build/CMakeFiles/genesis-hooks.dir
+/workspace/agent/build/CMakeFiles/genesis-response.dir
+/workspace/agent/build/CMakeFiles/genesis-sync.dir
+/workspace/agent/build/CMakeFiles/genesis-agent.dir
+/workspace/agent/build/CMakeFiles/test.dir
+/workspace/agent/build/CMakeFiles/edit_cache.dir
+/workspace/agent/build/CMakeFiles/rebuild_cache.dir
+/workspace/agent/build/tests/CMakeFiles/test_behavioral_profiler.dir
+/workspace/agent/build/tests/CMakeFiles/test.dir
+/workspace/agent/build/tests/CMakeFiles/edit_cache.dir
+/workspace/agent/build/tests/CMakeFiles/rebuild_cache.dir

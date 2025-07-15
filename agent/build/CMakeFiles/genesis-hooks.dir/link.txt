@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgenesis-hooks.a "CMakeFiles/genesis-hooks.dir/src/hooks/placeholder.cpp.o"
+/usr/bin/ranlib libgenesis-hooks.a

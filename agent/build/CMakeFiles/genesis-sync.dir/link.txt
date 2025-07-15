@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgenesis-sync.a "CMakeFiles/genesis-sync.dir/src/sync/placeholder.cpp.o"
+/usr/bin/ranlib libgenesis-sync.a
